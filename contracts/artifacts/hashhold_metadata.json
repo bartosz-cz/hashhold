@@ -75,6 +75,62 @@
 				"anonymous": false,
 				"inputs": [
 					{
+						"indexed": true,
+						"internalType": "uint256",
+						"name": "epochId",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "totalReward",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "totalRewardShares",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "rewardPerShare",
+						"type": "uint256"
+					}
+				],
+				"name": "EpochFinalized",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "uint256",
+						"name": "epochId",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "startTime",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "endTime",
+						"type": "uint256"
+					}
+				],
+				"name": "EpochStarted",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
 						"indexed": false,
 						"internalType": "uint256",
 						"name": "epochId",
@@ -137,6 +193,19 @@
 				"anonymous": false,
 				"inputs": [
 					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "tokenId",
+						"type": "address"
+					}
+				],
+				"name": "TokenAssociated",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
 						"indexed": true,
 						"internalType": "address",
 						"name": "user",
@@ -173,6 +242,19 @@
 			{
 				"stateMutability": "payable",
 				"type": "fallback"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_epochId",
+						"type": "uint256"
+					}
+				],
+				"name": "claimReward",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
 			},
 			{
 				"inputs": [
@@ -261,16 +343,30 @@
 						"internalType": "uint256",
 						"name": "_epochId",
 						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalReward",
-						"type": "uint256"
 					}
 				],
 				"name": "finalizeEpoch",
 				"outputs": [],
 				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "user",
+						"type": "address"
+					}
+				],
+				"name": "getUserStakesCount",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
 				"type": "function"
 			},
 			{
@@ -316,19 +412,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "rewardToken",
-				"outputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
 				"inputs": [
 					{
 						"internalType": "address",
@@ -362,19 +445,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "stakingToken",
-				"outputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
 				"inputs": [
 					{
 						"internalType": "uint256",
@@ -398,19 +468,6 @@
 				"name": "tokenAssociate",
 				"outputs": [],
 				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "totalHBARRewards",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
 				"type": "function"
 			},
 			{
@@ -570,6 +627,16 @@
 		"devdoc": {
 			"kind": "dev",
 			"methods": {
+				"claimReward(uint256)": {
+					"params": {
+						"_epochId": "The epoch to claim rewards from."
+					}
+				},
+				"getUserStakesCount(address)": {
+					"params": {
+						"user": "The address of the user to query."
+					}
+				},
 				"redirectForToken(address,bytes)": {
 					"params": {
 						"encodedFunctionSelector": "The function selector from the ERC20 interface + the bytes input for the function called",
@@ -620,8 +687,14 @@
 			},
 			"kind": "user",
 			"methods": {
-				"finalizeEpoch(uint256,uint256)": {
+				"claimReward(uint256)": {
+					"notice": "Claim rewards for a finalized epoch."
+				},
+				"finalizeEpoch(uint256)": {
 					"notice": "Finalize the epoch: locks in rewards, users can claim after this. This just marks epoch as finalized. Actual distribution on claim."
+				},
+				"getUserStakesCount(address)": {
+					"notice": "Get the number of stakes a user currently has."
 				},
 				"redirectForToken(address,bytes)": {
 					"notice": "Redirect for token"
@@ -711,11 +784,11 @@
 			]
 		},
 		"contracts/hashhold.sol": {
-			"keccak256": "0x4b62738b48b2e391a4a13e20bc28fd8806d56cc0aaa366c2ff9efabec0a82c2d",
+			"keccak256": "0xac80ff284ecdddc9afcac58ca73236f5a25d8bc4e009c6c21288e193ed63ad10",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://b8440def3319dd4cc790cf829dcc67e2e8ba609ee1bcad0d8f62aab576b5389c",
-				"dweb:/ipfs/QmXnqo9a6JRwVvpetyDCVbLakAv8T9FYMrevjiMW4Pn2NU"
+				"bzz-raw://80074f7ffec27742eb4a8b51c52a232a668cf1747288d040596b2ff42ba139d2",
+				"dweb:/ipfs/QmRdV2KL3TQVqy5UaAirezDkuWQZw5EgoTx9h1PqNwPqCd"
 			]
 		},
 		"https://github.com/hashgraph/hedera-smart-contracts/blob/main/contracts/system-contracts/HederaResponseCodes.sol": {

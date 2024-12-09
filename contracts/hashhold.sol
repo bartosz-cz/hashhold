@@ -11,17 +11,13 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  * @notice Conceptual demonstration. Not for production use without further testing and audits.
  */
 contract hashhold is HederaTokenService {
-    // HTS token for staking
-    address public stakingToken;      // HTS token address for staking
-    address public rewardToken;       // HTS token address for reward distribution
     mapping(address => uint256) public totalStaked;
-    uint256 public penaltyRate = 10;       
-    uint256 public totalHBARRewards; 
-    uint256 public epochId = 0;   
+    uint256 public penaltyRate = 10;
+    uint256 public epochId = 0;
     IPyth pyth;
     bytes32 hbarUsdPriceId;
-    uint constant ONE_MONTH = 30 days;
-    uint constant ONE_YEAR = 365 days; 
+    uint constant ONE_MONTH = 5 minutes;
+    uint constant ONE_YEAR = 60 minutes;
 
     struct Stake {
         address tokenId;
@@ -45,11 +41,16 @@ contract hashhold is HederaTokenService {
     mapping(uint256 => Epoch) public epochs;
     mapping(uint256 => mapping(address => bool)) public epochClaimed;
 
-    // Events
+    // Existing Events
     event Staked(address indexed user, uint256 amount, uint256 startTime, uint256 endTime, uint256 epochId);
     event Withdrawn(address indexed user, uint256 stakeIndex, uint256 amount, bool early, uint256 penalty);
     event RewardsDistributed(uint256 epochId, uint256 totalHBARDistributed, uint256 totalRewardTokenDistributed);
     event BoostUsed(address indexed user, uint256 stakeIndex, uint256 boostAmount, uint256 newRewardPercent);
+
+    // New Events
+    event EpochStarted(uint256 indexed epochId, uint256 startTime, uint256 endTime);
+    event EpochFinalized(uint256 indexed epochId, uint256 totalReward, uint256 totalRewardShares, uint256 rewardPerShare);
+    event TokenAssociated(address tokenId);
 
     // Since we're on Hedera, we rely on contract having proper associations and keys.
     constructor(address _pyth, bytes32 _hbarUsdPriceId) {
@@ -62,21 +63,6 @@ contract hashhold is HederaTokenService {
         _;
     }
 
-    function startNewEpoch(uint256 _endTime) external {
-        require(_endTime > block.timestamp, "End time must be future");
-        if (epochId > 0) {
-            require(epochs[epochId].finalized, "Previous epoch not finalized");
-        }
-        epochId += 1;
-        epochs[epochId] = Epoch({
-            startTime: block.timestamp,
-            endTime: _endTime,
-            totalReward: 0,
-            totalRewardShares: 0,
-            rewardPerShare: 0,
-            finalized: false
-        });
-    }
 
     /**
      * @notice Stake tokens into the current epoch.
@@ -93,7 +79,7 @@ contract hashhold is HederaTokenService {
         if (tokenId == address(0)) {
             require(msg.value == amount, "Incorrect HBAR amount sent");
         } else {
-        int responseCode = HederaTokenService.transferToken(tokenId, msg.sender, address(this), int64(int256(amount)));
+            int responseCode = HederaTokenService.transferToken(tokenId, msg.sender, address(this), int64(int256(amount)));
             require(responseCode == HederaResponseCodes.SUCCESS, "Token transfer to exchange failed");
         }
         
@@ -107,16 +93,14 @@ contract hashhold is HederaTokenService {
             hbarUsdPriceId,
             60
         );
-        uint256 rewardShares = uint256(uint64(price.price))*amount/100000000 * duration/1000000 * boostMultiplier;
-
-
+        uint256 rewardShares = (uint256(uint64(price.price)) * amount / 100000000) * (duration / 1000000) * boostMultiplier;
 
         userStakes[msg.sender].push(
             Stake({
                 tokenId: tokenId,
                 amount: amount,
                 startTime: block.timestamp,
-                endTime:  block.timestamp+duration,
+                endTime: block.timestamp + duration,
                 epochId: epochId,
                 rewardShares: rewardShares
             })
@@ -135,9 +119,7 @@ contract hashhold is HederaTokenService {
         }
 
         uint256 lnValue = Math.log2(boostTokenAmount + 1) * 1000; 
-
         uint256 scalingFactor = 361; 
-
         boost = (lnValue * scalingFactor) / 1000;
 
         if (boost > 2500) {
@@ -146,18 +128,17 @@ contract hashhold is HederaTokenService {
 
         return boost;
     }
-
     
     /**
      * @notice Withdraw staked tokens. If early, a penalty applies.
      */
     function withdraw(uint256 stakeIndex) external {
-        require(stakeIndex < userStakes[msg.sender].length, "Invalid index");
-        Stake memory s = userStakes[msg.sender][stakeIndex];
-        require(s.amount > 0, "Already withdrawn");
+        Stake[] memory s = userStakes[msg.sender];
+        require(stakeIndex < s.length, "Invalid index");
+        require(s[stakeIndex].amount > 0, "Already withdrawn");
         userStakes[msg.sender][stakeIndex].amount = 0; 
-        uint256 withdrawAmount = s.amount;
-        bool early = block.timestamp < s.endTime;
+        uint256 withdrawAmount = s[stakeIndex].amount;
+        bool early = block.timestamp < s[stakeIndex].endTime;
         uint256 penalty = 0;
         if (early) {
             penalty = (withdrawAmount * penaltyRate) / 100;
@@ -165,9 +146,7 @@ contract hashhold is HederaTokenService {
             epochs[epochId].totalReward += penalty;
         }
 
-       
-        totalStaked[s.tokenId] -= (withdrawAmount + penalty);
-
+        totalStaked[s[stakeIndex].tokenId] -= (withdrawAmount + penalty);
 
         // Transfer back user’s tokens (withdrawAmount)
         if (withdrawAmount > 0) {
@@ -183,29 +162,84 @@ contract hashhold is HederaTokenService {
         return int64(uint64(value));
     }
 
+    function startNewEpoch(uint256 _endTime) external {
+        require(_endTime > block.timestamp, "End time must be future");
+        if (epochId > 0) {
+            require(epochs[epochId].finalized, "Previous epoch not finalized");
+        }
+        epochId += 1;
+        epochs[epochId] = Epoch({
+            startTime: block.timestamp,
+            endTime: _endTime,
+            totalReward: 0,
+            totalRewardShares: 0,
+            rewardPerShare: 0,
+            finalized: false
+        });
+
+        emit EpochStarted(epochId, block.timestamp, _endTime);
+    }
+
     /**
      * @notice Finalize the epoch: locks in rewards, users can claim after this.
      * This just marks epoch as finalized. Actual distribution on claim.
      */
-    function finalizeEpoch(uint256 _epochId, uint256 totalReward) external {
-        Epoch storage ep = epochs[_epochId];
+    function finalizeEpoch(uint256 _epochId) external {
+        Epoch memory ep = epochs[_epochId];
         require(!ep.finalized, "Already finalized");
         require(block.timestamp > ep.endTime, "Epoch not ended");
-        ep.finalized = true;
-        ep.totalReward = totalReward;
+        epochs[_epochId].finalized = true;
         if (ep.totalRewardShares > 0) {
-            ep.rewardPerShare = totalReward * 1e18 / ep.totalRewardShares; // scale by 1e18 for precision
+            epochs[_epochId].rewardPerShare = (ep.totalReward * 1e18) / ep.totalRewardShares; // scale by 1e18 for precision
         }
 
+        emit EpochFinalized(_epochId, ep.totalReward, ep.totalRewardShares, ep.rewardPerShare);
     }
     
     /**
      * @notice Associate this contract with a token.
      */
     function tokenAssociate(address tokenId) external {
-       int response = associateToken(address(this), tokenId);
-       require(response == HederaResponseCodes.SUCCESS, "Associate Failed");
+        int response = associateToken(address(this), tokenId);
+        require(response == HederaResponseCodes.SUCCESS, "Associate Failed");
+        emit TokenAssociated(tokenId);
     }
+
+        /**
+     * @notice Claim rewards for a finalized epoch.
+     * @param _epochId The epoch to claim rewards from.
+     */
+    function claimReward(uint256 _epochId) external onlyAfterEpochFinalized(_epochId) {
+        require(!epochClaimed[_epochId][msg.sender], "Already claimed");
+        Epoch storage ep = epochs[_epochId];
+        require(ep.totalRewardShares > 0, "No reward pool for this epoch");
+
+        uint256 userShares = 0;
+        Stake[] memory s = userStakes[msg.sender];
+        for (uint256 i = 0; i < s.length; i++) {
+            if (s[i].epochId == _epochId) {
+                userShares += s[i].rewardShares;
+            }
+        }
+        require(userShares > 0, "No shares in this epoch");
+
+        uint256 rewardAmount = (ep.rewardPerShare * userShares) / 1e18;
+        require(address(this).balance >= rewardAmount, "Insufficient contract balance");
+
+        epochClaimed[_epochId][msg.sender] = true;
+
+        (bool success, ) = msg.sender.call{value: rewardAmount}("");
+        require(success, "HBAR transfer failed");
+    }
+
+    /**
+     * @notice Get the number of stakes a user currently has.
+     * @param user The address of the user to query.
+     */
+    function getUserStakesCount(address user) external view returns (uint256) {
+        return userStakes[user].length;
+    }
+
 
     /**
      * @notice Receive fallback to accept HBAR
