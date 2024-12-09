@@ -643,7 +643,7 @@
 	},
 	"settings": {
 		"compilationTarget": {
-			"contracts/hashkeep.sol": "TimeLockedStakingOnHedera"
+			"contracts/hashhold.sol": "TimeLockedStakingOnHedera"
 		},
 		"evmVersion": "cancun",
 		"libraries": {},
@@ -705,7 +705,7 @@
 				"dweb:/ipfs/QmfNFesQffYisafmJFbKHxVFSD8fY49X1z9f8N7qtfW8AX"
 			]
 		},
-		"contracts/hashkeep.sol": {
+		"contracts/hashhold.sol": {
 			"keccak256": "0x69c0d7aaa174608788c1e377b9b72744b5e283a12dd606fb24a31de81cab7da5",
 			"license": "GPL-3.0",
 			"urls": [

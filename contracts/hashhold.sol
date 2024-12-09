@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  * @title Time-Locked Staking Contract on Hedera
  * @notice Conceptual demonstration. Not for production use without further testing and audits.
  */
-contract TimeLockedStakingOnHedera is HederaTokenService {
+contract hashhold is HederaTokenService {
     // HTS token for staking
     address public stakingToken;      // HTS token address for staking
     address public rewardToken;       // HTS token address for reward distribution
@@ -83,7 +83,7 @@ contract TimeLockedStakingOnHedera is HederaTokenService {
      * @param amount Amount of tokens to stake (must be pre-approved to contract)
      * @param boostTokenAmount Amount of reward tokens to burn for a reward boost
      */
-    function stake(address tokenId, uint256 amount,uint256 duration, uint256 boostTokenAmount) external payable {
+    function stake(address tokenId, uint256 amount,uint256 duration, uint256 boostTokenAmount,bytes[] calldata priceUpdate) external payable {
         require(epochId > 0, "No active epoch");
         Epoch storage ep = epochs[epochId];
         require(block.timestamp < ep.endTime, "Epoch ended");
@@ -101,7 +101,8 @@ contract TimeLockedStakingOnHedera is HederaTokenService {
         if (boostTokenAmount > 0) {
             boostMultiplier = calculateBoost(boostTokenAmount); 
         }
-       
+        uint fee = pyth.getUpdateFee(priceUpdate);
+        pyth.updatePriceFeeds{ value: fee }(priceUpdate);
         PythStructs.Price memory price = pyth.getPriceNoOlderThan(
             hbarUsdPriceId,
             60
