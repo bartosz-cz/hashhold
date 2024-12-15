@@ -24,8 +24,8 @@ contract hashhold is HederaTokenService {
         uint256 amount;    
         uint256 startTime;  
         uint256 endTime;
-        uint256 epochId;
         uint256 rewardShares;
+        uint256 nextToClaim;
     }
 
     struct Epoch {
@@ -39,7 +39,7 @@ contract hashhold is HederaTokenService {
 
     mapping(address => Stake[]) public userStakes;
     mapping(uint256 => Epoch) public epochs;
-    mapping(uint256 => mapping(address => bool)) public epochClaimed;
+    mapping(uint256 => mapping(address => mapping( uint256 => bool))) public epochClaimed;
 
     // Existing Events
     event Staked(address indexed user, uint256 amount, uint256 startTime, uint256 endTime, uint256 epochId);
@@ -56,6 +56,7 @@ contract hashhold is HederaTokenService {
     constructor(address _pyth, bytes32 _hbarUsdPriceId) {
         pyth = IPyth(_pyth);
         hbarUsdPriceId = _hbarUsdPriceId;
+        startNewEpoch();
     }
 
     modifier onlyAfterEpochFinalized(uint256 _epochId) {
@@ -63,6 +64,39 @@ contract hashhold is HederaTokenService {
         _;
     }
 
+    function startNewEpoch() private {
+        if (epochId > 0) {
+            require(epochs[epochId].finalized, "Previous epoch not finalized");
+        }
+        uint256 _endTime = block.timestamp + 1 hours;
+        epochId += 1;
+        epochs[epochId] = Epoch({
+            startTime: block.timestamp,
+            endTime: _endTime,
+            totalReward: 0,
+            totalRewardShares: 0,
+            rewardPerShare: 0,
+            finalized: false
+        });
+
+        emit EpochStarted(epochId, block.timestamp, _endTime);
+    }
+
+    /**
+     * @notice Finalize the epoch: locks in rewards, users can claim after this.
+     * This just marks epoch as finalized. Actual distribution on claim.
+     */
+    function finalizeEpoch() private  {
+        Epoch memory ep = epochs[epochId];
+        require(!ep.finalized, "Already finalized");
+        require(block.timestamp > ep.endTime, "Epoch not ended");
+        epochs[epochId].finalized = true;
+        if (ep.totalRewardShares > 0) {
+            epochs[epochId].rewardPerShare = (ep.totalReward * 1e18) / ep.totalRewardShares; // scale by 1e18 for precision
+        }
+
+        emit EpochFinalized(epochId, ep.totalReward, ep.totalRewardShares, ep.rewardPerShare);
+    }
 
     /**
      * @notice Stake tokens into the current epoch.
@@ -70,11 +104,13 @@ contract hashhold is HederaTokenService {
      * @param boostTokenAmount Amount of reward tokens to burn for a reward boost
      */
     function stake(address tokenId, uint256 amount,uint256 duration, uint256 boostTokenAmount,bytes[] calldata priceUpdate) external payable {
-        require(epochId > 0, "No active epoch");
-        Epoch storage ep = epochs[epochId];
-        require(block.timestamp < ep.endTime, "Epoch ended");
+        Epoch memory ep = epochs[epochId];
+        if(block.timestamp > ep.endTime){
+            finalizeEpoch();
+            startNewEpoch();
+        }
         require(amount > 0, "Stake amount must be > 0");
-        require(duration >= ONE_MONTH && duration <= ONE_YEAR, "Wrong stake duration");
+        require(duration >= 5 minutes && duration <= 30 minutes, "Wrong stake duration");
 
         if (tokenId == address(0)) {
             require(msg.value == amount, "Incorrect HBAR amount sent");
@@ -101,13 +137,13 @@ contract hashhold is HederaTokenService {
                 amount: amount,
                 startTime: block.timestamp,
                 endTime: block.timestamp + duration,
-                epochId: epochId,
+                nextToClaim: epochId,
                 rewardShares: rewardShares
             })
         );
 
         totalStaked[tokenId] += amount;
-        ep.totalRewardShares += rewardShares;
+        epochs[epochId].totalRewardShares += rewardShares;
 
         emit Staked(msg.sender, amount, block.timestamp, ep.endTime, epochId);
     }
@@ -136,6 +172,11 @@ contract hashhold is HederaTokenService {
         Stake[] memory s = userStakes[msg.sender];
         require(stakeIndex < s.length, "Invalid index");
         require(s[stakeIndex].amount > 0, "Already withdrawn");
+        Epoch memory ep = epochs[epochId];
+        if(block.timestamp > ep.endTime){
+            finalizeEpoch();
+            startNewEpoch();
+        }
         userStakes[msg.sender][stakeIndex].amount = 0; 
         uint256 withdrawAmount = s[stakeIndex].amount;
         bool early = block.timestamp < s[stakeIndex].endTime;
@@ -162,40 +203,6 @@ contract hashhold is HederaTokenService {
         return int64(uint64(value));
     }
 
-    function startNewEpoch(uint256 _endTime) external {
-        require(_endTime > block.timestamp, "End time must be future");
-        if (epochId > 0) {
-            require(epochs[epochId].finalized, "Previous epoch not finalized");
-        }
-        epochId += 1;
-        epochs[epochId] = Epoch({
-            startTime: block.timestamp,
-            endTime: _endTime,
-            totalReward: 0,
-            totalRewardShares: 0,
-            rewardPerShare: 0,
-            finalized: false
-        });
-
-        emit EpochStarted(epochId, block.timestamp, _endTime);
-    }
-
-    /**
-     * @notice Finalize the epoch: locks in rewards, users can claim after this.
-     * This just marks epoch as finalized. Actual distribution on claim.
-     */
-    function finalizeEpoch(uint256 _epochId) external {
-        Epoch memory ep = epochs[_epochId];
-        require(!ep.finalized, "Already finalized");
-        require(block.timestamp > ep.endTime, "Epoch not ended");
-        epochs[_epochId].finalized = true;
-        if (ep.totalRewardShares > 0) {
-            epochs[_epochId].rewardPerShare = (ep.totalReward * 1e18) / ep.totalRewardShares; // scale by 1e18 for precision
-        }
-
-        emit EpochFinalized(_epochId, ep.totalReward, ep.totalRewardShares, ep.rewardPerShare);
-    }
-    
     /**
      * @notice Associate this contract with a token.
      */
@@ -205,39 +212,31 @@ contract hashhold is HederaTokenService {
         emit TokenAssociated(tokenId);
     }
 
-        /**
-     * @notice Claim rewards for a finalized epoch.
-     * @param _epochId The epoch to claim rewards from.
-     */
-    function claimReward(uint256 _epochId) external onlyAfterEpochFinalized(_epochId) {
-        require(!epochClaimed[_epochId][msg.sender], "Already claimed");
-        Epoch storage ep = epochs[_epochId];
-        require(ep.totalRewardShares > 0, "No reward pool for this epoch");
-
-        uint256 userShares = 0;
+    
+    function claimReward() external {
         Stake[] memory s = userStakes[msg.sender];
-        for (uint256 i = 0; i < s.length; i++) {
-            if (s[i].epochId == _epochId) {
-                userShares += s[i].rewardShares;
-            }
+        require(s.length > 0, "No active stakes");
+        Epoch memory ep = epochs[epochId];
+        if(block.timestamp > ep.endTime){
+            finalizeEpoch();
+            startNewEpoch();
         }
-        require(userShares > 0, "No shares in this epoch");
+        uint256 totalReward = 0;
+        for (uint256 i = 0; i < s.length; i++) {
+             for (uint256 e = s[i].nextToClaim; e < epochId ; e++) {
+                Epoch memory cE = epochs[e]; // Directly access epochs[e]
+                if(cE.finalized && cE.rewardPerShare != 0){
+                        totalReward += (cE.rewardPerShare * s[i].rewardShares) / 1e18;
+                }
+             }
+            userStakes[msg.sender][i].nextToClaim = epochId;
+        }
+        
+        require(totalReward > 0, "No reward to claim");
 
-        uint256 rewardAmount = (ep.rewardPerShare * userShares) / 1e18;
-        require(address(this).balance >= rewardAmount, "Insufficient contract balance");
-
-        epochClaimed[_epochId][msg.sender] = true;
-
-        (bool success, ) = msg.sender.call{value: rewardAmount}("");
+        require(address(this).balance >= totalReward, "Insufficient contract balance");
+        (bool success, ) = msg.sender.call{value: totalReward}("");
         require(success, "HBAR transfer failed");
-    }
-
-    /**
-     * @notice Get the number of stakes a user currently has.
-     * @param user The address of the user to query.
-     */
-    function getUserStakesCount(address user) external view returns (uint256) {
-        return userStakes[user].length;
     }
 
 
