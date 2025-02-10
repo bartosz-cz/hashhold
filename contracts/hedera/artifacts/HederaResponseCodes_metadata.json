@@ -1,0 +1,45 @@
+{
+	"compiler": {
+		"version": "0.8.26+commit.8a97fa7a"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/hedera/HederaTokenResponse.sol": "HederaResponseCodes"
+		},
+		"evmVersion": "cancun",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"contracts/hedera/HederaTokenResponse.sol": {
+			"keccak256": "0x8fb241071e3f99ca11181dcd07ec7934ac40c8b4d9c31428be5478e0697a4435",
+			"license": "Apache-2.0",
+			"urls": [
+				"bzz-raw://9254e95fe31e42419d4ff79ecbe0bf5453d9052b232d5adb013ef1bab6d67612",
+				"dweb:/ipfs/QmdA7Ne6taK2pXkcDTK6Fr51BZBKqoukTVvFSqwkieAPCv"
+			]
+		}
+	},
+	"version": 1
+}

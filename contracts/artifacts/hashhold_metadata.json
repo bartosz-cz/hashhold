@@ -13,6 +13,16 @@
 						"type": "address"
 					},
 					{
+						"internalType": "address",
+						"name": "quoterV2Address",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "_saucerSwapV3RouterAddress",
+						"type": "address"
+					},
+					{
 						"internalType": "bytes32",
 						"name": "_hbarUsdPriceId",
 						"type": "bytes32"
@@ -20,6 +30,11 @@
 				],
 				"stateMutability": "nonpayable",
 				"type": "constructor"
+			},
+			{
+				"inputs": [],
+				"name": "ReentrancyGuardReentrantCall",
+				"type": "error"
 			},
 			{
 				"anonymous": false,
@@ -131,25 +146,19 @@
 				"anonymous": false,
 				"inputs": [
 					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "epochId",
-						"type": "uint256"
+						"indexed": true,
+						"internalType": "address",
+						"name": "user",
+						"type": "address"
 					},
 					{
 						"indexed": false,
 						"internalType": "uint256",
-						"name": "totalHBARDistributed",
-						"type": "uint256"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "totalRewardTokenDistributed",
+						"name": "totalReward",
 						"type": "uint256"
 					}
 				],
-				"name": "RewardsDistributed",
+				"name": "RewardClaimed",
 				"type": "event"
 			},
 			{
@@ -182,7 +191,7 @@
 					{
 						"indexed": false,
 						"internalType": "uint256",
-						"name": "epochId",
+						"name": "stakeIndex",
 						"type": "uint256"
 					}
 				],
@@ -281,6 +290,19 @@
 			},
 			{
 				"inputs": [],
+				"name": "epochDuration",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
 				"name": "epochId",
 				"outputs": [
 					{
@@ -338,12 +360,90 @@
 			},
 			{
 				"inputs": [],
+				"name": "hbarUsdPriceId",
+				"outputs": [
+					{
+						"internalType": "bytes32",
+						"name": "",
+						"type": "bytes32"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "maxStakeDuration",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "minStakeDuration",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "owner",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
 				"name": "penaltyRate",
 				"outputs": [
 					{
 						"internalType": "uint256",
 						"name": "",
 						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "pyth",
+				"outputs": [
+					{
+						"internalType": "contract IPyth",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "quoterV2",
+				"outputs": [
+					{
+						"internalType": "contract IQuoterV2",
+						"name": "",
+						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -375,6 +475,128 @@
 						"type": "bytes"
 					}
 				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "saucerSwapV3Router",
+				"outputs": [
+					{
+						"internalType": "contract ISaucerSwapV3Router",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "saucerSwapV3RouterAddress",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_epochDuration",
+						"type": "uint256"
+					}
+				],
+				"name": "setEpochDuration",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "_priceId",
+						"type": "bytes32"
+					}
+				],
+				"name": "setHbarUsdPriceId",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_penaltyRate",
+						"type": "uint256"
+					}
+				],
+				"name": "setPenaltyRate",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_pyth",
+						"type": "address"
+					}
+				],
+				"name": "setPyth",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_quoterV2",
+						"type": "address"
+					}
+				],
+				"name": "setQuoterV2",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_router",
+						"type": "address"
+					}
+				],
+				"name": "setSaucerSwapV3Router",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_min",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_max",
+						"type": "uint256"
+					}
+				],
+				"name": "setStakeDurationBounds",
+				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
 			},
@@ -579,6 +801,14 @@
 			}
 		],
 		"devdoc": {
+			"details": "Time-locked staking contract on Hedera. Demonstration only, not for production use.",
+			"errors": {
+				"ReentrancyGuardReentrantCall()": [
+					{
+						"details": "Unauthorized reentrant call."
+					}
+				]
+			},
 			"kind": "dev",
 			"methods": {
 				"redirectForToken(address,bytes)": {
@@ -593,8 +823,16 @@
 				},
 				"stake(address,uint256,uint256,uint256,bytes[])": {
 					"params": {
-						"amount": "Amount of tokens to stake (must be pre-approved to contract)",
-						"boostTokenAmount": "Amount of reward tokens to burn for a reward boost"
+						"amount": "Amount of tokens to stake.",
+						"boostTokenAmount": "Additional tokens to burn for a reward boost.",
+						"duration": "Duration for which tokens are locked.",
+						"priceUpdate": "Pyth price feed updates.",
+						"tokenId": "The token being staked (0x0 for HBAR)."
+					}
+				},
+				"tokenAssociate(address)": {
+					"params": {
+						"tokenId": "The token address to associate with."
 					}
 				},
 				"transferFrom(address,address,address,uint256)": {
@@ -618,9 +856,14 @@
 					"returns": {
 						"responseCode": "The response code for the status of the request. SUCCESS is 22."
 					}
+				},
+				"withdraw(uint256)": {
+					"params": {
+						"stakeIndex": "Index of the user's stake to withdraw."
+					}
 				}
 			},
-			"title": "Time-Locked Staking Contract on Hedera",
+			"title": "HashHold",
 			"version": 1
 		},
 		"userdoc": {
@@ -631,14 +874,38 @@
 			},
 			"kind": "user",
 			"methods": {
+				"claimReward()": {
+					"notice": "Claims all available rewards from finalized epochs."
+				},
 				"redirectForToken(address,bytes)": {
 					"notice": "Redirect for token"
 				},
+				"setEpochDuration(uint256)": {
+					"notice": "Change the epoch duration (e.g., 1 hours → 2 hours)."
+				},
+				"setHbarUsdPriceId(bytes32)": {
+					"notice": "Update the Pyth HBAR/USD price feed ID."
+				},
+				"setPenaltyRate(uint256)": {
+					"notice": "Update the penalty rate (0 - 100)."
+				},
+				"setPyth(address)": {
+					"notice": "Update the Pyth price feed contract."
+				},
+				"setQuoterV2(address)": {
+					"notice": "Update the quoter contract address."
+				},
+				"setSaucerSwapV3Router(address)": {
+					"notice": "Update the SaucerSwap V3 router address."
+				},
+				"setStakeDurationBounds(uint256,uint256)": {
+					"notice": "Update min/max stake durations."
+				},
 				"stake(address,uint256,uint256,uint256,bytes[])": {
-					"notice": "Stake tokens into the current epoch."
+					"notice": "Stake tokens or HBAR into the current epoch."
 				},
 				"tokenAssociate(address)": {
-					"notice": "Associate this contract with a token."
+					"notice": "Associates this contract with a given HTS token."
 				},
 				"transferFrom(address,address,address,uint256)": {
 					"notice": "Only applicable to fungible tokens"
@@ -647,10 +914,9 @@
 					"notice": "Transfers `serialNumber` of `token` from `from` to `to` using the allowance mechanism. Only applicable to NFT tokens"
 				},
 				"withdraw(uint256)": {
-					"notice": "Withdraw staked tokens. If early, a penalty applies."
+					"notice": "Withdraw staked tokens. If withdrawn early, a penalty applies."
 				}
 			},
-			"notice": "Conceptual demonstration. Not for production use without further testing and audits.",
 			"version": 1
 		}
 	},
@@ -676,6 +942,14 @@
 			"urls": [
 				"bzz-raw://c6a5ff4f9fd8649b7ee20800b7fa387d3465bd77cf20c2d1068cd5c98e1ed57a",
 				"dweb:/ipfs/QmVSaVJf9FXFhdYEYeCEfjMVHrxDh5qL4CGkxdMWpQCrqG"
+			]
+		},
+		"@openzeppelin/contracts/utils/ReentrancyGuard.sol": {
+			"keccak256": "0x11a5a79827df29e915a12740caf62fe21ebe27c08c9ae3e09abe9ee3ba3866d3",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://3cf0c69ab827e3251db9ee6a50647d62c90ba580a4d7bbff21f2bea39e7b2f4a",
+				"dweb:/ipfs/QmZiKwtKU1SBX4RGfQtY7PZfiapbbu6SZ9vizGQD9UHjRA"
 			]
 		},
 		"@openzeppelin/contracts/utils/math/Math.sol": {
@@ -719,35 +993,35 @@
 			]
 		},
 		"contracts/hashhold.sol": {
-			"keccak256": "0x204b8e669cb1cadf8aea7d09803e2ca5ab333912f862440ac7471a65f6436b10",
+			"keccak256": "0x278fbc9aff782aa9361c0dc3e5f1c17b16dc0d171cd5214d153165b43f32861f",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://3749d6cbc796624f4be4b528960ab589eaee0595e0e75f060768f3a54ec5f859",
-				"dweb:/ipfs/QmXTXqtonieb16Rj5Z3esScgkhjWTvB6kYaziGSvxaS3y4"
+				"bzz-raw://5f0911af81518aa16257d0d77805cc9640a0a0156192f4d405dcefa99131f451",
+				"dweb:/ipfs/QmZB8yDKaAvM4aXZjt7nsaZ9H8HLHukxf8bGMqwwkLRtzM"
 			]
 		},
-		"https://github.com/hashgraph/hedera-smart-contracts/blob/main/contracts/system-contracts/HederaResponseCodes.sol": {
-			"keccak256": "0x85734572347c25f45480488ad4fdb63ed749a794daac839540f5b0eb7dbb22e6",
+		"contracts/hedera/HederaResponseCodes.sol": {
+			"keccak256": "0x8fb241071e3f99ca11181dcd07ec7934ac40c8b4d9c31428be5478e0697a4435",
 			"license": "Apache-2.0",
 			"urls": [
-				"bzz-raw://addc4c8c31e1b3fd001986599856bb39e9cb4532a922155f699aae1686563e63",
-				"dweb:/ipfs/QmXJES7o4xoSowiDo3qm3Mr3LaWm7g5qTQosw5EAAiz9R5"
+				"bzz-raw://9254e95fe31e42419d4ff79ecbe0bf5453d9052b232d5adb013ef1bab6d67612",
+				"dweb:/ipfs/QmdA7Ne6taK2pXkcDTK6Fr51BZBKqoukTVvFSqwkieAPCv"
 			]
 		},
-		"https://github.com/hashgraph/hedera-smart-contracts/blob/main/contracts/system-contracts/hedera-token-service/HederaTokenService.sol": {
-			"keccak256": "0x525a483268ca9d477022bd6e68c061439287a74a06b39c11c7ac01fc472634d9",
+		"contracts/hedera/HederaTokenService.sol": {
+			"keccak256": "0x445622ef2a2bd167b17a5149f5da605ee31b2d96baca8522518345bd62184d81",
 			"license": "Apache-2.0",
 			"urls": [
-				"bzz-raw://b58afacf451253baf88b3cb551515abfab5815253f4144add30e6818dbf4da8e",
-				"dweb:/ipfs/QmYfdWHCoZJcNNgL2Zrm3usdRe9jP6cyQVir4app7Cmxzg"
+				"bzz-raw://b2f093320549abd1d729bad334f990f6047cb8db62596a94ab7afd76b6d4eea4",
+				"dweb:/ipfs/QmbHKTGcmjSRkrkWR9NGsFhrHkg4JEcUn1sU7BUKVWed33"
 			]
 		},
-		"https://github.com/hashgraph/hedera-smart-contracts/blob/main/contracts/system-contracts/hedera-token-service/IHederaTokenService.sol": {
-			"keccak256": "0xa1df3c5269b6555c4c9fe9b6be44ed95faf2a87fd91d4b9c535f934898460ff5",
+		"contracts/hedera/IHederaTokenService.sol": {
+			"keccak256": "0x92046c50214fde51d8106e8eb4323f97d639317a13e61db318206c06816cd34d",
 			"license": "Apache-2.0",
 			"urls": [
-				"bzz-raw://d7b021948dae4147e7c46021ee49d63150f27da3e6356bf70bc76003a8b5c1e8",
-				"dweb:/ipfs/QmYwosQniqTwcwMJxViER9dszf9SmKD3ZTMMF5U4kRCMoP"
+				"bzz-raw://60051e2271f2d0063ce26759b56d2b1d80b2758e19859958f2f71b2140511591",
+				"dweb:/ipfs/QmNbYSbTY7qEEkmyN2rh5UfAc4sXSdpSJKFDgWvN526FeB"
 			]
 		}
 	},

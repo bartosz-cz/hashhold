@@ -1,28 +1,96 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.0 <0.9.0;
 
-import "https://github.com/hashgraph/hedera-smart-contracts/blob/main/contracts/system-contracts/hedera-token-service/HederaTokenService.sol";
-import "https://github.com/hashgraph/hedera-smart-contracts/blob/main/contracts/system-contracts/HederaResponseCodes.sol";
+/*
+ *  Hedera Time-Locked Staking Contract Example
+ *  -------------------------------------------
+ *  Demonstration contract for educational purposes. Not audited or production-ready.
+ */
+
+import "./hedera/HederaResponseCodes.sol";
+import "./hedera/HederaTokenService.sol";
 import "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+interface IQuoterV2 {
+    function quoteExactInput(bytes memory path, uint256 amountIn)
+        external
+        returns (
+            uint256 amountOut,
+            uint160[] memory sqrtPriceX96AfterList,
+            uint32[] memory initializedTicksCrossedList,
+            uint256 gasEstimate
+        );
+}
+
+interface ISaucerSwapV3Router {
+    function swapExactTokensForETH(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external returns (uint[] memory amounts);
+}
 
 /**
- * @title Time-Locked Staking Contract on Hedera
- * @notice Conceptual demonstration. Not for production use without further testing and audits.
+ * @title HashHold
+ * @dev Time-locked staking contract on Hedera. Demonstration only, not for production use.
  */
-contract hashhold is HederaTokenService {
-    mapping(address => uint256) public totalStaked;
-    uint256 public penaltyRate = 10;
-    uint256 public epochId = 0;
-    IPyth pyth;
-    bytes32 hbarUsdPriceId;
-    uint constant ONE_MONTH = 5 minutes;
-    uint constant ONE_YEAR = 60 minutes;
+contract hashhold is HederaTokenService, ReentrancyGuard {
+    // ====================================================
+    // Ownership
+    // ====================================================
+    address public owner;
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not contract owner");
+        _;
+    }
+
+    // ====================================================
+    // Configurable Constants
+    // ====================================================
+    // These were fixed in your original code. Now we expose them for configuration.
+    uint256 public minStakeDuration = 5 seconds;
+    uint256 public maxStakeDuration = 30 minutes;
+
+    // Instead of hardcoding 1 hour for each epoch, let's make it configurable.
+    uint256 public epochDuration = 5 seconds;
+
+    // ====================================================
+    // State Variables
+    // ====================================================
+    mapping(address => uint256) public totalStaked;
+    mapping(address => Stake[]) public userStakes;
+    mapping(uint256 => Epoch) public epochs;
+    mapping(uint256 => mapping(address => mapping(uint256 => bool))) public epochClaimed;
+
+    // Current penalty rate in percentage (0 - 100)
+    uint256 public penaltyRate = 10;
+
+    // Current epoch ID
+    uint256 public epochId = 0;
+
+    // External contract references
+    IQuoterV2 public quoterV2;
+    ISaucerSwapV3Router public saucerSwapV3Router;
+    IPyth public pyth;
+
+    // Router address used for token approvals
+    address public saucerSwapV3RouterAddress;
+
+    // Pyth price feed info
+    bytes32 public hbarUsdPriceId;
+
+    // ====================================================
+    // Structs
+    // ====================================================
     struct Stake {
         address tokenId;
-        uint256 amount;    
-        uint256 startTime;  
+        uint256 amount;
+        uint256 startTime;
         uint256 endTime;
         uint256 rewardShares;
         uint256 nextToClaim;
@@ -37,44 +105,171 @@ contract hashhold is HederaTokenService {
         bool finalized;
     }
 
-    mapping(address => Stake[]) public userStakes;
-    mapping(uint256 => Epoch) public epochs;
-    mapping(uint256 => mapping(address => mapping( uint256 => bool))) public epochClaimed;
-
-    // Existing Events
-    event Staked(address indexed user, uint256 amount, uint256 startTime, uint256 endTime, uint256 epochId);
-    event Withdrawn(address indexed user, uint256 stakeIndex, uint256 amount, bool early, uint256 penalty);
-    event RewardsDistributed(uint256 epochId, uint256 totalHBARDistributed, uint256 totalRewardTokenDistributed);
-    event BoostUsed(address indexed user, uint256 stakeIndex, uint256 boostAmount, uint256 newRewardPercent);
-
-    // New Events
-    event EpochStarted(uint256 indexed epochId, uint256 startTime, uint256 endTime);
-    event EpochFinalized(uint256 indexed epochId, uint256 totalReward, uint256 totalRewardShares, uint256 rewardPerShare);
+    // ====================================================
+    // Events
+    // ====================================================
+    event Staked(
+        address indexed user,
+        uint256 amount,
+        uint256 startTime,
+        uint256 endTime,
+        uint256 stakeIndex
+    );
+    event Withdrawn(
+        address indexed user,
+        uint256 stakeIndex,
+        uint256 amount,
+        bool early,
+        uint256 penalty
+    );
+    event BoostUsed(
+        address indexed user,
+        uint256 stakeIndex,
+        uint256 boostAmount,
+        uint256 newRewardPercent
+    );
+    event EpochStarted(
+        uint256 indexed epochId,
+        uint256 startTime,
+        uint256 endTime
+    );
+    event EpochFinalized(
+        uint256 indexed epochId,
+        uint256 totalReward,
+        uint256 totalRewardShares,
+        uint256 rewardPerShare
+    );
+    event RewardClaimed(
+        address indexed user,
+        uint256 totalReward
+    );
     event TokenAssociated(address tokenId);
 
-    // Since we're on Hedera, we rely on contract having proper associations and keys.
-    constructor(address _pyth, bytes32 _hbarUsdPriceId) {
+    // ====================================================
+    // Constructor
+    // ====================================================
+    constructor(
+        address _pyth,
+        address quoterV2Address,
+        address _saucerSwapV3RouterAddress,
+        bytes32 _hbarUsdPriceId
+    ) {
         pyth = IPyth(_pyth);
+        quoterV2 = IQuoterV2(quoterV2Address);
+        saucerSwapV3Router = ISaucerSwapV3Router(_saucerSwapV3RouterAddress);
+        saucerSwapV3RouterAddress = _saucerSwapV3RouterAddress;
         hbarUsdPriceId = _hbarUsdPriceId;
-        startNewEpoch();
+
+        owner = msg.sender; // Set owner
+
+        _startNewEpoch();
     }
 
+    // ====================================================
+    // Modifiers
+    // ====================================================
+    /**
+     * @dev Ensures an epoch is finalized before interacting.
+     */
     modifier onlyAfterEpochFinalized(uint256 _epochId) {
         require(epochs[_epochId].finalized, "Epoch not finalized");
         _;
     }
 
-    function startNewEpoch() private {
+    /**
+     * @dev Checks if the current epoch should be finalized and starts a new epoch if needed.
+     */
+    modifier checkAndFinalizeEpoch() {
+        Epoch storage currentEpoch = epochs[epochId];
+        if (block.timestamp > currentEpoch.endTime && !currentEpoch.finalized) {
+            _finalizeEpoch();
+            _startNewEpoch();
+        }
+        _;
+    }
+
+    // ====================================================
+    // Owner-Only Setters
+    // ====================================================
+    /**
+     * @notice Update the penalty rate (0 - 100).
+     */
+    function setPenaltyRate(uint256 _penaltyRate) external onlyOwner {
+        require(_penaltyRate <= 100, "Penalty rate exceeds 100%");
+        penaltyRate = _penaltyRate;
+    }
+
+    /**
+     * @notice Update the Pyth price feed contract.
+     */
+    function setPyth(address _pyth) external onlyOwner {
+        require(_pyth != address(0), "Invalid address");
+        pyth = IPyth(_pyth);
+    }
+
+    /**
+     * @notice Update the quoter contract address.
+     */
+    function setQuoterV2(address _quoterV2) external onlyOwner {
+        require(_quoterV2 != address(0), "Invalid address");
+        quoterV2 = IQuoterV2(_quoterV2);
+    }
+
+    /**
+     * @notice Update the SaucerSwap V3 router address.
+     */
+    function setSaucerSwapV3Router(address _router) external onlyOwner {
+        require(_router != address(0), "Invalid address");
+        saucerSwapV3Router = ISaucerSwapV3Router(_router);
+        saucerSwapV3RouterAddress = _router;
+    }
+
+    /**
+     * @notice Update the Pyth HBAR/USD price feed ID.
+     */
+    function setHbarUsdPriceId(bytes32 _priceId) external onlyOwner {
+        hbarUsdPriceId = _priceId;
+    }
+
+    /**
+     * @notice Change the epoch duration (e.g., 1 hours → 2 hours).
+     */
+    function setEpochDuration(uint256 _epochDuration) external onlyOwner {
+        require(_epochDuration > 0, "Epoch duration must be > 0");
+        epochDuration = _epochDuration;
+    }
+
+    /**
+     * @notice Update min/max stake durations.
+     */
+    function setStakeDurationBounds(uint256 _min, uint256 _max) external onlyOwner {
+        require(_min < _max, "min must be < max");
+        minStakeDuration = _min;
+        maxStakeDuration = _max;
+    }
+
+    // ====================================================
+    // Epoch Management
+    // ====================================================
+
+    /**
+     * @dev Starts a new epoch. Requires the previous epoch to be finalized.
+     */
+    function _startNewEpoch() private {
+        uint256 lastEpochRewardShares = 0;
         if (epochId > 0) {
             require(epochs[epochId].finalized, "Previous epoch not finalized");
+            lastEpochRewardShares = epochs[epochId].totalRewardShares;
         }
-        uint256 _endTime = block.timestamp + 1 hours;
+
+        uint256 _endTime = block.timestamp + epochDuration;
         epochId += 1;
+
         epochs[epochId] = Epoch({
             startTime: block.timestamp,
             endTime: _endTime,
             totalReward: 0,
-            totalRewardShares: 0,
+            totalRewardShares: lastEpochRewardShares,
             rewardPerShare: 0,
             finalized: false
         });
@@ -83,167 +278,356 @@ contract hashhold is HederaTokenService {
     }
 
     /**
-     * @notice Finalize the epoch: locks in rewards, users can claim after this.
-     * This just marks epoch as finalized. Actual distribution on claim.
+     * @dev Finalizes the current epoch; locks rewards and calculates rewardPerShare.
      */
-    function finalizeEpoch() private  {
-        Epoch memory ep = epochs[epochId];
+    function _finalizeEpoch() private {
+        Epoch storage ep = epochs[epochId];
         require(!ep.finalized, "Already finalized");
         require(block.timestamp > ep.endTime, "Epoch not ended");
-        epochs[epochId].finalized = true;
+
+        ep.finalized = true;
+
         if (ep.totalRewardShares > 0) {
-            epochs[epochId].rewardPerShare = (ep.totalReward * 1e18) / ep.totalRewardShares; // scale by 1e18 for precision
+            // Scale by 1e18 for precision
+            ep.rewardPerShare = (ep.totalReward * 1e8) / ep.totalRewardShares;
         }
 
-        emit EpochFinalized(epochId, ep.totalReward, ep.totalRewardShares, ep.rewardPerShare);
+        emit EpochFinalized(
+            epochId,
+            ep.totalReward,
+            ep.totalRewardShares,
+            ep.rewardPerShare
+        );
+    }
+
+    // ====================================================
+    // Staking
+    // ====================================================
+
+    /**
+     * @dev Builds a swap path for the quoter/router.
+     * @param tokenIn Input token address
+     * @param tokenOut Output token address
+     * @param fee Pool fee
+     */
+    function buildPath(
+        address tokenIn,
+        address tokenOut,
+        uint24 fee
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(tokenIn, fee, tokenOut);
     }
 
     /**
-     * @notice Stake tokens into the current epoch.
-     * @param amount Amount of tokens to stake (must be pre-approved to contract)
-     * @param boostTokenAmount Amount of reward tokens to burn for a reward boost
+     * @notice Stake tokens or HBAR into the current epoch.
+     * @param tokenId The token being staked (0x0 for HBAR).
+     * @param amount Amount of tokens to stake.
+     * @param duration Duration for which tokens are locked.
+     * @param boostTokenAmount Additional tokens to burn for a reward boost.
+     * @param priceUpdate Pyth price feed updates.
      */
-    function stake(address tokenId, uint256 amount,uint256 duration, uint256 boostTokenAmount,bytes[] calldata priceUpdate) external payable {
-        Epoch memory ep = epochs[epochId];
-        if(block.timestamp > ep.endTime){
-            finalizeEpoch();
-            startNewEpoch();
-        }
+    function stake(
+        address tokenId,
+        uint256 amount,
+        uint256 duration,
+        uint256 boostTokenAmount,
+        bytes[] calldata priceUpdate
+    ) external payable nonReentrant checkAndFinalizeEpoch {
         require(amount > 0, "Stake amount must be > 0");
-        require(duration >= 5 minutes && duration <= 30 minutes, "Wrong stake duration");
-
-        if (tokenId == address(0)) {
-            require(msg.value == amount, "Incorrect HBAR amount sent");
-        } else {
-            int responseCode = HederaTokenService.transferToken(tokenId, msg.sender, address(this), int64(int256(amount)));
-            require(responseCode == HederaResponseCodes.SUCCESS, "Token transfer to exchange failed");
-        }
-        
-        uint256 boostMultiplier = 0;
-        if (boostTokenAmount > 0) {
-            boostMultiplier = calculateBoost(boostTokenAmount); 
-        }
-        uint fee = pyth.getUpdateFee(priceUpdate);
-        pyth.updatePriceFeeds{ value: fee }(priceUpdate);
-        PythStructs.Price memory price = pyth.getPriceNoOlderThan(
-            hbarUsdPriceId,
-            60
+        require(
+            duration >= minStakeDuration && duration <= maxStakeDuration,
+            "Stake duration out of range"
         );
-        uint256 rewardShares = (uint256(uint64(price.price)) * amount / 100000000) * (duration / 1000000) * boostMultiplier;
+
+        uint256 tokenValue;
+        uint256 stackedAmount = amount;
+        // Transfer tokens / HBAR to contract
+        if (tokenId == address(0)) {
+            // HBAR staking
+            require(msg.value == amount, "Incorrect HBAR amount sent");
+            uint256 fee = pyth.getUpdateFee(priceUpdate);
+            stackedAmount -= fee;
+            pyth.updatePriceFeeds{value: fee}(priceUpdate);
+
+            PythStructs.Price memory price = pyth.getPriceNoOlderThan(
+                hbarUsdPriceId,
+                60
+            );
+            // Price is scaled by expo => scale to 'regular' decimals
+            uint256 scaledPrice = uint256(int256(price.price)) /
+                10 ** uint256(uint32(-price.expo));
+
+            tokenValue = (scaledPrice * stackedAmount) / 100000000;
+            require(tokenValue >= 100, "Token value under 1 USD");
+        } else {
+            // HTS token staking
+            bytes memory path = buildPath(
+                tokenId,
+                0x0000000000000000000000000000000000001549, // Example target token
+                500
+            );
+            (
+                uint256 amountOut,
+                ,
+                ,
+                
+            ) = quoterV2.quoteExactInput(path, amount);
+
+            tokenValue = amountOut / 10000;
+            require(tokenValue >= 100, "Token value under 1 USD");
+
+            int256 responseCode = HederaTokenService.transferToken(
+                tokenId,
+                msg.sender,
+                address(this),
+                int64(int256(amount))
+            );
+            require(
+                responseCode == HederaResponseCodes.SUCCESS,
+                "Token transfer failed"
+            );
+        }
+
+        // Calculate reward shares
+        uint256 baseRewardShares = tokenValue * duration;
+        uint256 rewardShares = baseRewardShares;
+
+        // If boost is applied
+        if (boostTokenAmount > 0) {
+            rewardShares = _calculateBoostedShares(
+                rewardShares,
+                boostTokenAmount
+            );
+        }
 
         userStakes[msg.sender].push(
             Stake({
                 tokenId: tokenId,
-                amount: amount,
+                amount: stackedAmount,
                 startTime: block.timestamp,
                 endTime: block.timestamp + duration,
-                nextToClaim: epochId,
-                rewardShares: rewardShares
+                rewardShares: rewardShares,
+                nextToClaim: epochId
             })
         );
 
         totalStaked[tokenId] += amount;
         epochs[epochId].totalRewardShares += rewardShares;
 
-        emit Staked(msg.sender, amount, block.timestamp, ep.endTime, epochId);
+        emit Staked(
+            msg.sender,
+            stackedAmount,
+            block.timestamp,
+            block.timestamp + duration,
+            userStakes[msg.sender].length - 1
+        );
     }
 
-
-    function calculateBoost(uint256 boostTokenAmount) internal pure returns (uint256 boost) {
+    /**
+     * @dev Calculates reward shares with a logarithmic-based boost.
+     */
+    function _calculateBoostedShares(
+        uint256 rewardShares,
+        uint256 boostTokenAmount
+    ) internal pure returns (uint256) {
         if (boostTokenAmount < 1) {
-            return 0;
+            return rewardShares;
         }
 
-        uint256 lnValue = Math.log2(boostTokenAmount + 1) * 1000; 
-        uint256 scalingFactor = 361; 
-        boost = (lnValue * scalingFactor) / 1000;
+        // lnValue ~ log2(boostTokenAmount + 1) * 1000
+        uint256 lnValue = Math.log2(boostTokenAmount + 1) * 1000;
+        // scalingFactor ~ 361
+        uint256 scalingFactor = 361;
+        // boost ~ (lnValue * scalingFactor) / 100000
+        uint256 boost = (lnValue * scalingFactor) / 100000;
 
+        // Cap at 25% = 2500 basis points
         if (boost > 2500) {
             boost = 2500;
         }
 
-        return boost;
+        // final = rewardShares * (100 + boost) / 100
+        return (rewardShares * (100 + boost)) / 100;
     }
-    
+
+    // ====================================================
+    // Withdraw
+    // ====================================================
     /**
-     * @notice Withdraw staked tokens. If early, a penalty applies.
+     * @notice Withdraw staked tokens. If withdrawn early, a penalty applies.
+     * @param stakeIndex Index of the user's stake to withdraw.
      */
-    function withdraw(uint256 stakeIndex) external {
-        Stake[] memory s = userStakes[msg.sender];
-        require(stakeIndex < s.length, "Invalid index");
-        require(s[stakeIndex].amount > 0, "Already withdrawn");
-        Epoch memory ep = epochs[epochId];
-        if(block.timestamp > ep.endTime){
-            finalizeEpoch();
-            startNewEpoch();
-        }
-        userStakes[msg.sender][stakeIndex].amount = 0; 
-        uint256 withdrawAmount = s[stakeIndex].amount;
-        bool early = block.timestamp < s[stakeIndex].endTime;
+    function withdraw(uint256 stakeIndex)
+        external
+        nonReentrant
+        checkAndFinalizeEpoch
+    {
+        require(
+            stakeIndex < userStakes[msg.sender].length,
+            "Invalid index"
+        );
+
+        Stake storage userStake = userStakes[msg.sender][stakeIndex];
+        require(userStake.amount > 0, "Already withdrawn");
+
+        uint256 withdrawAmount = userStake.amount;
+        bool early = (block.timestamp < userStake.endTime);
         uint256 penalty = 0;
+        uint256 penaltyInHbar = 0;
+
+        // Apply penalty if withdrawing early
         if (early) {
             penalty = (withdrawAmount * penaltyRate) / 100;
             withdrawAmount -= penalty;
-            epochs[epochId].totalReward += penalty;
         }
 
-        totalStaked[s[stakeIndex].tokenId] -= (withdrawAmount + penalty);
+        // Effects
+        userStake.amount = 0; // Prevent re-withdraw
+        totalStaked[userStake.tokenId] -= (withdrawAmount + penalty);
 
-        // Transfer back user’s tokens (withdrawAmount)
-        if (withdrawAmount > 0) {
+        // Interactions
+        if (userStake.tokenId == address(0)) {
+            // HBAR
+            penaltyInHbar = penalty;
+            require(
+                address(this).balance >= withdrawAmount,
+                "Insufficient contract balance"
+            );
             (bool success, ) = msg.sender.call{value: withdrawAmount}("");
-            require(success, "Failed to send HBAR to existing requester");
+            require(success, "Failed to send HBAR");
+
+        } else {
+            // HTS tokens
+            int256 responseCode = HederaTokenService.transferToken(
+                userStake.tokenId,
+                address(this),
+                msg.sender,
+                safeCastToInt64(withdrawAmount)
+            );
+            require(
+                responseCode == HederaResponseCodes.SUCCESS,
+                "Token transfer back failed"
+            );
+
+            if (early) {
+                // 1. Approve penalty tokens for router
+                responseCode = HederaTokenService.approve(
+                    userStake.tokenId,
+                    saucerSwapV3RouterAddress,
+                    penalty
+                );
+                require(
+                    responseCode == HederaResponseCodes.SUCCESS,
+                    "Failed to approve tokens for router"
+                );
+
+                // Build path
+                bytes memory path = buildPath(
+                    userStake.tokenId,
+                    0x0000000000000000000000000000000000003aD2,
+                    500
+                );
+
+                address[] memory path2 = new address[](2);
+                path2[0] = userStake.tokenId;
+                path2[1] = 0x0000000000000000000000000000000000003aD2;
+
+                (
+                    uint256 amountOut,
+                    ,
+                    ,
+                    
+                ) = quoterV2.quoteExactInput(path, penalty);
+
+                // Swap penalty tokens for HBAR
+                uint[] memory amounts = saucerSwapV3Router.swapExactTokensForETH(
+                    penalty,
+                    amountOut,
+                    path2,
+                    address(this),
+                    block.timestamp
+                );
+
+                penaltyInHbar = amounts[amounts.length - 1];
+            }
         }
 
-        emit Withdrawn(msg.sender, stakeIndex, withdrawAmount, early, penalty);
+        // Add penalty to current epoch reward
+        if (early) {
+            epochs[epochId].totalReward += penaltyInHbar;
+        }
+
+        emit Withdrawn(
+            msg.sender,
+            stakeIndex,
+            withdrawAmount,
+            early,
+            penaltyInHbar
+        );
     }
 
+    // ====================================================
+    // Claim Reward
+    // ====================================================
+    /**
+     * @notice Claims all available rewards from finalized epochs.
+     */
+    function claimReward() external nonReentrant checkAndFinalizeEpoch {
+        Stake[] storage stakes = userStakes[msg.sender];
+        require(stakes.length > 0, "No active stakes");
+
+        uint256 totalReward = 0;
+
+        for (uint256 i = 0; i < stakes.length; i++) {
+            Stake storage s = stakes[i];
+
+            for (uint256 e = s.nextToClaim; e < epochId; e++) {
+                Epoch storage closedEpoch = epochs[e];
+                if (closedEpoch.finalized && closedEpoch.rewardPerShare != 0) {
+                    totalReward += (closedEpoch.rewardPerShare * s.rewardShares) / 1e8;
+                }
+            }
+            // Update nextToClaim to the current epoch
+            s.nextToClaim = epochId;
+        }
+
+        require(
+            address(this).balance >= totalReward,
+            "Insufficient contract balance"
+        );
+
+        (bool success, ) = msg.sender.call{value: totalReward}("");
+        require(success, "HBAR transfer failed");
+        emit RewardClaimed(
+            msg.sender,
+            totalReward
+        );
+    }
+
+    // ====================================================
+    // Utility
+    // ====================================================
+    /**
+     * @dev Safely cast a uint256 to int64, reverting if out of range.
+     */
     function safeCastToInt64(uint256 value) internal pure returns (int64) {
-        require(value <= uint256(int256((type(int64).max))), "Value exceeds int64 max value");
+        require(value <= uint256(int256(type(int64).max)), "Value exceeds int64 max");
         return int64(uint64(value));
     }
 
     /**
-     * @notice Associate this contract with a token.
+     * @notice Associates this contract with a given HTS token.
+     * @param tokenId The token address to associate with.
      */
     function tokenAssociate(address tokenId) external {
-        int response = associateToken(address(this), tokenId);
+        int256 response = associateToken(address(this), tokenId);
         require(response == HederaResponseCodes.SUCCESS, "Associate Failed");
         emit TokenAssociated(tokenId);
     }
 
-    
-    function claimReward() external {
-        Stake[] memory s = userStakes[msg.sender];
-        require(s.length > 0, "No active stakes");
-        Epoch memory ep = epochs[epochId];
-        if(block.timestamp > ep.endTime){
-            finalizeEpoch();
-            startNewEpoch();
-        }
-        uint256 totalReward = 0;
-        for (uint256 i = 0; i < s.length; i++) {
-             for (uint256 e = s[i].nextToClaim; e < epochId ; e++) {
-                Epoch memory cE = epochs[e]; // Directly access epochs[e]
-                if(cE.finalized && cE.rewardPerShare != 0){
-                        totalReward += (cE.rewardPerShare * s[i].rewardShares) / 1e18;
-                }
-             }
-            userStakes[msg.sender][i].nextToClaim = epochId;
-        }
-        
-        require(totalReward > 0, "No reward to claim");
-
-        require(address(this).balance >= totalReward, "Insufficient contract balance");
-        (bool success, ) = msg.sender.call{value: totalReward}("");
-        require(success, "HBAR transfer failed");
-    }
-
-
-    /**
-     * @notice Receive fallback to accept HBAR
-     */
+    // ====================================================
+    // Receive & Fallback
+    // ====================================================
     receive() external payable {}
-
     fallback() external payable {}
 }
