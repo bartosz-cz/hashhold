@@ -24,14 +24,22 @@ interface IQuoterV2 {
         );
 }
 
-interface ISaucerSwapV3Router {
-    function swapExactTokensForETH(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
+
+
+interface ISaucerSwapV2Router {
+    struct ExactInputParams {
+        bytes path;
+        address recipient;
+        uint256 deadline;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+    }
+
+    function unwrapWHBAR(uint256 amountMinimum, address recipient) external payable;
+
+    function multicall(bytes[] calldata data) external payable returns (bytes[] memory results);
+
+    function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut);
 }
 
 /**
@@ -75,11 +83,11 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
 
     // External contract references
     IQuoterV2 public quoterV2;
-    ISaucerSwapV3Router public saucerSwapV3Router;
+    ISaucerSwapV2Router public saucerSwapV2Router;
     IPyth public pyth;
 
     // Router address used for token approvals
-    address public saucerSwapV3RouterAddress;
+    address public saucerSwapV2RouterAddress;
 
     // Pyth price feed info
     bytes32 public hbarUsdPriceId;
@@ -151,13 +159,13 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
     constructor(
         address _pyth,
         address quoterV2Address,
-        address _saucerSwapV3RouterAddress,
+        address _saucerSwapV2RouterAddress,
         bytes32 _hbarUsdPriceId
     ) {
         pyth = IPyth(_pyth);
         quoterV2 = IQuoterV2(quoterV2Address);
-        saucerSwapV3Router = ISaucerSwapV3Router(_saucerSwapV3RouterAddress);
-        saucerSwapV3RouterAddress = _saucerSwapV3RouterAddress;
+        saucerSwapV2Router = ISaucerSwapV2Router(_saucerSwapV2RouterAddress);
+        saucerSwapV2RouterAddress = _saucerSwapV2RouterAddress;
         hbarUsdPriceId = _hbarUsdPriceId;
 
         owner = msg.sender; // Set owner
@@ -218,10 +226,10 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
     /**
      * @notice Update the SaucerSwap V3 router address.
      */
-    function setSaucerSwapV3Router(address _router) external onlyOwner {
+    function setSaucerSwapV2Router(address _router) external onlyOwner {
         require(_router != address(0), "Invalid address");
-        saucerSwapV3Router = ISaucerSwapV3Router(_router);
-        saucerSwapV3RouterAddress = _router;
+        saucerSwapV2Router = ISaucerSwapV2Router(_router);
+        saucerSwapV2RouterAddress = _router;
     }
 
     /**
@@ -312,8 +320,8 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
      */
     function buildPath(
         address tokenIn,
-        address tokenOut,
-        uint24 fee
+        uint24 fee,
+        address tokenOut
     ) internal pure returns (bytes memory) {
         return abi.encodePacked(tokenIn, fee, tokenOut);
     }
@@ -363,8 +371,8 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
             // HTS token staking
             bytes memory path = buildPath(
                 tokenId,
-                0x0000000000000000000000000000000000001549, // Example target token
-                500
+                3000,
+                0x0000000000000000000000000000000000003aD2 // Example target token
             );
             (
                 uint256 amountOut,
@@ -513,7 +521,7 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
                 // 1. Approve penalty tokens for router
                 responseCode = HederaTokenService.approve(
                     userStake.tokenId,
-                    saucerSwapV3RouterAddress,
+                    saucerSwapV2RouterAddress,
                     penalty
                 );
                 require(
@@ -524,13 +532,9 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
                 // Build path
                 bytes memory path = buildPath(
                     userStake.tokenId,
-                    0x0000000000000000000000000000000000003aD2,
-                    500
+                    3000,
+                    0x0000000000000000000000000000000000003aD2
                 );
-
-                address[] memory path2 = new address[](2);
-                path2[0] = userStake.tokenId;
-                path2[1] = 0x0000000000000000000000000000000000003aD2;
 
                 (
                     uint256 amountOut,
@@ -538,17 +542,36 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
                     ,
                     
                 ) = quoterV2.quoteExactInput(path, penalty);
+                ISaucerSwapV2Router.ExactInputParams memory params = ISaucerSwapV2Router.ExactInputParams({
+                    path: path,
+                    recipient: saucerSwapV2RouterAddress,
+                    deadline: block.timestamp + 30,
+                    amountIn: penalty,
+                    amountOutMinimum: amountOut
+                });
+                
 
-                // Swap penalty tokens for HBAR
-                uint[] memory amounts = saucerSwapV3Router.swapExactTokensForETH(
-                    penalty,
-                    amountOut,
-                    path2,
-                    address(this),
-                    block.timestamp
+                bytes memory swapCall = abi.encodeWithSelector(
+                    ISaucerSwapV2Router.exactInput.selector,
+                    params
                 );
 
-                penaltyInHbar = amounts[amounts.length - 1];
+                // Step 3: Encode Unwrap Call
+                bytes memory unwrapCall = abi.encodeWithSelector(
+                    ISaucerSwapV2Router.unwrapWHBAR.selector,
+                    amountOut,
+                    address(this) // Send unwrapped HBAR to contract
+                );
+
+                // Step 4: Execute Both in a Single Multicall
+                bytes[] memory calls = new bytes[](2);
+                calls[0] = swapCall;
+                calls[1] = unwrapCall;
+
+                bytes[] memory results = ISaucerSwapV2Router(saucerSwapV2Router).multicall(calls);
+                (uint256 swapAmountOut) = abi.decode(results[0], (uint256));
+                
+                penaltyInHbar = swapAmountOut;
             }
         }
 
