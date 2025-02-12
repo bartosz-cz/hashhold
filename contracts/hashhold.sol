@@ -121,7 +121,8 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
         uint256 amount,
         uint256 startTime,
         uint256 endTime,
-        uint256 stakeIndex
+        uint256 stakeIndex,
+        address tokenId
     );
     event Withdrawn(
         address indexed user,
@@ -397,9 +398,7 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
         }
 
         // Calculate reward shares
-        uint256 baseRewardShares = tokenValue * duration;
-        uint256 rewardShares = baseRewardShares;
-
+        uint256 rewardShares = tokenValue * duration;
         // If boost is applied
         if (boostTokenAmount > 0) {
             rewardShares = _calculateBoostedShares(
@@ -427,7 +426,8 @@ contract hashhold is HederaTokenService, ReentrancyGuard {
             stackedAmount,
             block.timestamp,
             block.timestamp + duration,
-            userStakes[msg.sender].length - 1
+            userStakes[msg.sender].length - 1,
+            tokenId
         );
     }
 
