@@ -72,6 +72,22 @@
 		"remappings": []
 	},
 	"sources": {
+		"@openzeppelin/contracts/access/Ownable.sol": {
+			"keccak256": "0xff6d0bb2e285473e5311d9d3caacb525ae3538a80758c10649a4d61029b017bb",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://8ed324d3920bb545059d66ab97d43e43ee85fd3bd52e03e401f020afb0b120f6",
+				"dweb:/ipfs/QmfEckWLmZkDDcoWrkEvMWhms66xwTLff9DDhegYpvHo1a"
+			]
+		},
+		"@openzeppelin/contracts/utils/Context.sol": {
+			"keccak256": "0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12",
+				"dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"
+			]
+		},
 		"@openzeppelin/contracts/utils/Panic.sol": {
 			"keccak256": "0xf7fe324703a64fc51702311dc51562d5cb1497734f074e4f483bfb6717572d7a",
 			"license": "MIT",
@@ -129,11 +145,11 @@
 			]
 		},
 		"contracts/hashhold.sol": {
-			"keccak256": "0x3c7160af23a35c0a84bc4de04dbb9cb380f28eabcccecd4c2e4fa7018354b93e",
+			"keccak256": "0x5d6509c77b17f766a923c4fd3008a09d069f737df384cdb8dd8caa5c278f4bd1",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://ddf812a76ab99a07715a164626b03d771edfb2b890f762fc52fea28b2b4fd86d",
-				"dweb:/ipfs/QmUTbjN17R7k75grsDxzevd1MUzAL6EShbNZyY9vtdv3ZW"
+				"bzz-raw://4a52cbf6c4c4b88d4f1f040cb4ac30fcbe8fc9359ef85c17cc636cb05c530a58",
+				"dweb:/ipfs/QmaL4cLGqpi3JwcUyPaMCuYHyySRA5yzcM9RpSqotCT7oC"
 			]
 		},
 		"contracts/hedera/HederaResponseCodes.sol": {

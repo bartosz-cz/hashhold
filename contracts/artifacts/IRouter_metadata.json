@@ -1,0 +1,225 @@
+{
+	"compiler": {
+		"version": "0.8.26+commit.8a97fa7a"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [
+					{
+						"components": [
+							{
+								"internalType": "bytes",
+								"name": "path",
+								"type": "bytes"
+							},
+							{
+								"internalType": "address",
+								"name": "recipient",
+								"type": "address"
+							},
+							{
+								"internalType": "uint256",
+								"name": "deadline",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "amountIn",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "amountOutMinimum",
+								"type": "uint256"
+							}
+						],
+						"internalType": "struct IRouter.ExactInputParams",
+						"name": "params",
+						"type": "tuple"
+					}
+				],
+				"name": "exactInput",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "amountOut",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes[]",
+						"name": "data",
+						"type": "bytes[]"
+					}
+				],
+				"name": "multicall",
+				"outputs": [
+					{
+						"internalType": "bytes[]",
+						"name": "results",
+						"type": "bytes[]"
+					}
+				],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "amountMinimum",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "recipient",
+						"type": "address"
+					}
+				],
+				"name": "unwrapWHBAR",
+				"outputs": [],
+				"stateMutability": "payable",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/hashhold.sol": "IRouter"
+		},
+		"evmVersion": "cancun",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"@openzeppelin/contracts/access/Ownable.sol": {
+			"keccak256": "0xff6d0bb2e285473e5311d9d3caacb525ae3538a80758c10649a4d61029b017bb",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://8ed324d3920bb545059d66ab97d43e43ee85fd3bd52e03e401f020afb0b120f6",
+				"dweb:/ipfs/QmfEckWLmZkDDcoWrkEvMWhms66xwTLff9DDhegYpvHo1a"
+			]
+		},
+		"@openzeppelin/contracts/utils/Context.sol": {
+			"keccak256": "0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12",
+				"dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"
+			]
+		},
+		"@openzeppelin/contracts/utils/Panic.sol": {
+			"keccak256": "0xf7fe324703a64fc51702311dc51562d5cb1497734f074e4f483bfb6717572d7a",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://c6a5ff4f9fd8649b7ee20800b7fa387d3465bd77cf20c2d1068cd5c98e1ed57a",
+				"dweb:/ipfs/QmVSaVJf9FXFhdYEYeCEfjMVHrxDh5qL4CGkxdMWpQCrqG"
+			]
+		},
+		"@openzeppelin/contracts/utils/ReentrancyGuard.sol": {
+			"keccak256": "0x11a5a79827df29e915a12740caf62fe21ebe27c08c9ae3e09abe9ee3ba3866d3",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://3cf0c69ab827e3251db9ee6a50647d62c90ba580a4d7bbff21f2bea39e7b2f4a",
+				"dweb:/ipfs/QmZiKwtKU1SBX4RGfQtY7PZfiapbbu6SZ9vizGQD9UHjRA"
+			]
+		},
+		"@openzeppelin/contracts/utils/math/Math.sol": {
+			"keccak256": "0xa00be322d7db5786750ce0ac7e2f5b633ac30a5ed5fa1ced1e74acfc19acecea",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://6c84e822f87cbdc4082533b626667b6928715bb2b1e8e7eb96954cebb9e38c8d",
+				"dweb:/ipfs/QmZmy9dgxLTerBAQDuuHqbL6EpgRxddqgv5KmwpXYVbKz1"
+			]
+		},
+		"@openzeppelin/contracts/utils/math/SafeCast.sol": {
+			"keccak256": "0x195533c86d0ef72bcc06456a4f66a9b941f38eb403739b00f21fd7c1abd1ae54",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://b1d578337048cad08c1c03041cca5978eff5428aa130c781b271ad9e5566e1f8",
+				"dweb:/ipfs/QmPFKL2r9CBsMwmUqqdcFPfHZB2qcs9g1HDrPxzWSxomvy"
+			]
+		},
+		"@pythnetwork/pyth-sdk-solidity/IPyth.sol": {
+			"keccak256": "0x217532ece69b8e472a6260b740c34aebfb5a299bbfed6392cf0458ed368be7ab",
+			"license": "Apache-2.0",
+			"urls": [
+				"bzz-raw://02d1b71006ccdfd6402a2b72ea197babbd1b54c26a70ebb76a114f0ae8352f08",
+				"dweb:/ipfs/QmbqfuvwriG3AEwYEwupUaQKgfxRYK6Qui99o6wQysPoP3"
+			]
+		},
+		"@pythnetwork/pyth-sdk-solidity/IPythEvents.sol": {
+			"keccak256": "0x7ca8e03315d4516d6833c425a52c43e8cacf2077492074d2d36ae5c17899c9c8",
+			"license": "Apache-2.0",
+			"urls": [
+				"bzz-raw://ad1c69d157eccb09ce248e1ec021f2e58b61dd36160f5be3973a7bea4a899f64",
+				"dweb:/ipfs/QmW1yXsDrMsuQKxtZanSZXpyUW2QwnCKVoCjS5fC3NoSVY"
+			]
+		},
+		"@pythnetwork/pyth-sdk-solidity/PythStructs.sol": {
+			"keccak256": "0xade221177dda98ebd194c363f264ceea125bde0e6a7a72f7b54da3ac60316894",
+			"license": "Apache-2.0",
+			"urls": [
+				"bzz-raw://a404dbbc64183995326c345cae27601d37c783b3d9030c8dc0ab4943fa2bf1da",
+				"dweb:/ipfs/QmfNFesQffYisafmJFbKHxVFSD8fY49X1z9f8N7qtfW8AX"
+			]
+		},
+		"contracts/hashhold.sol": {
+			"keccak256": "0x0e5b978f9afb24e8664856f5fdacb82e2485152b16725880e1a513e280c6ba26",
+			"license": "GPL-3.0",
+			"urls": [
+				"bzz-raw://5419c3eb1e33b185e8010d54b8b1a37f296c2ec0b68aa45cfcd44104dd9aea06",
+				"dweb:/ipfs/QmaWiB8PrFZVd9wn3jRGfjCdAzEzvGJxPyR3ENYvMHPC9h"
+			]
+		},
+		"contracts/hedera/HederaResponseCodes.sol": {
+			"keccak256": "0x8fb241071e3f99ca11181dcd07ec7934ac40c8b4d9c31428be5478e0697a4435",
+			"license": "Apache-2.0",
+			"urls": [
+				"bzz-raw://9254e95fe31e42419d4ff79ecbe0bf5453d9052b232d5adb013ef1bab6d67612",
+				"dweb:/ipfs/QmdA7Ne6taK2pXkcDTK6Fr51BZBKqoukTVvFSqwkieAPCv"
+			]
+		},
+		"contracts/hedera/HederaTokenService.sol": {
+			"keccak256": "0x445622ef2a2bd167b17a5149f5da605ee31b2d96baca8522518345bd62184d81",
+			"license": "Apache-2.0",
+			"urls": [
+				"bzz-raw://b2f093320549abd1d729bad334f990f6047cb8db62596a94ab7afd76b6d4eea4",
+				"dweb:/ipfs/QmbHKTGcmjSRkrkWR9NGsFhrHkg4JEcUn1sU7BUKVWed33"
+			]
+		},
+		"contracts/hedera/IHederaTokenService.sol": {
+			"keccak256": "0x92046c50214fde51d8106e8eb4323f97d639317a13e61db318206c06816cd34d",
+			"license": "Apache-2.0",
+			"urls": [
+				"bzz-raw://60051e2271f2d0063ce26759b56d2b1d80b2758e19859958f2f71b2140511591",
+				"dweb:/ipfs/QmNbYSbTY7qEEkmyN2rh5UfAc4sXSdpSJKFDgWvN526FeB"
+			]
+		}
+	},
+	"version": 1
+}
