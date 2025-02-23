@@ -313,9 +313,10 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             pyth.updatePriceFeeds{value: fee}(priceUpdate);
 
             PythStructs.Price memory price = pyth.getPriceNoOlderThan(hbarUsdPriceId, 60);
-            uint256 scaledPrice = uint256(int256(price.price)) / 10 ** uint256(uint32(-price.expo));
-            tokenValue = (scaledPrice * stakedAmount) / 100000000;
-            require(tokenValue >= 100, "Token value under 1 USD");
+            // Zwiększamy precyzję, mnożąc przez 1e18
+            uint256 scaledPrice = (uint256(int256(price.price)) * 1e18) / (10 ** uint256(uint32(-price.expo)));
+            tokenValue = (scaledPrice * stakedAmount) / (100000000 * 1e18);
+            require(tokenValue >= 1, "Token value under 1 USD");
         } else {
             // HTS token staking
             bytes memory swapPath = encodeSwapPath(
@@ -327,11 +328,10 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
                 uint256 amountOut,
                 ,
                 ,
-                
             ) = saucerSwapQuoter.quoteExactInput(swapPath, amount);
 
-            tokenValue = amountOut / 10000;
-            require(tokenValue >= 100, "Token value under 1 USD");
+            tokenValue = amountOut / 1000000;
+            require(tokenValue >= 1, "Token value under 1 USD");
 
             int256 responseCode = HederaTokenService.transferToken(
                 tokenId,
@@ -389,6 +389,7 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
     // Withdraw Function
     // ====================================================
     function withdraw(uint256 stakeIndex) external nonReentrant checkAndFinalizeEpoch {
+        _claimReward();
         uint256 stakeCount = userStakes[msg.sender].length;
         require(stakeIndex < stakeCount, "Invalid index");
 
@@ -475,6 +476,8 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             epochs[epochId].totalReward += penaltyInHbar;
         }
 
+        epochs[epochId].totalRewardShares -= userStake.rewardShares;
+
         emit Withdrawn(
             msg.sender,
             stakeIndex,
@@ -482,7 +485,7 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             isEarlyWithdrawal,
             penaltyInHbar
         );
-
+        
         if (stakeCount > 1 && stakeIndex != stakeCount - 1) {
             for (uint256 j = stakeIndex; j < stakeCount - 1; j++) {
                 userStakes[msg.sender][j] = userStakes[msg.sender][j + 1];
@@ -494,7 +497,11 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
     // ====================================================
     // Reward Claiming
     // ====================================================
-    function claimReward() external nonReentrant checkAndFinalizeEpoch {
+    function claimReward() external  nonReentrant{
+      _claimReward();
+    }
+
+    function _claimReward() private checkAndFinalizeEpoch {
         uint256 totalReward = 0;
         uint256 stakeCount = userStakes[msg.sender].length;
 
@@ -523,7 +530,6 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
 
         emit RewardClaimed(msg.sender, totalReward);
     }
-
 
     // ====================================================
     // Utility Functions
