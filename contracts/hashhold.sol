@@ -300,7 +300,8 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             duration >= minStakeDuration && duration <= maxStakeDuration,
             "Stake duration out of range"
         );
-
+        require(userStakes[msg.sender].length < 10, "Maximum number of active stakes reached");
+        
         uint256 tokenValue;
         uint256 stakedAmount = amount;
 
@@ -388,7 +389,8 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
     // Withdraw Function
     // ====================================================
     function withdraw(uint256 stakeIndex) external nonReentrant checkAndFinalizeEpoch {
-        require(stakeIndex < userStakes[msg.sender].length, "Invalid index");
+        uint256 stakeCount = userStakes[msg.sender].length;
+        require(stakeIndex < stakeCount, "Invalid index");
 
         Stake storage userStake = userStakes[msg.sender][stakeIndex];
         require(userStake.amount > 0, "Already withdrawn");
@@ -403,7 +405,6 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             withdrawAmount -= penalty;
         }
 
-        userStake.amount = 0;
         totalStakedAmount[userStake.tokenId] -= (withdrawAmount + penalty);
 
         if (userStake.tokenId == address(0)) {
@@ -447,7 +448,7 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
                     amountIn: penalty,
                     amountOutMinimum: amountOut
                 });
-                
+
                 bytes memory swapCall = abi.encodeWithSelector(
                     IRouter.exactInput.selector,
                     params
@@ -465,7 +466,7 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
 
                 bytes[] memory results = IRouter(saucerSwapRouter).multicall(calls);
                 (uint256 swapAmountOut) = abi.decode(results[0], (uint256));
-                
+
                 penaltyInHbar = swapAmountOut;
             }
         }
@@ -481,34 +482,48 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             isEarlyWithdrawal,
             penaltyInHbar
         );
+
+        if (stakeCount > 1 && stakeIndex != stakeCount - 1) {
+            for (uint256 j = stakeIndex; j < stakeCount - 1; j++) {
+                userStakes[msg.sender][j] = userStakes[msg.sender][j + 1];
+            }
+        }
+        userStakes[msg.sender].pop(); 
     }
 
     // ====================================================
     // Reward Claiming
     // ====================================================
     function claimReward() external nonReentrant checkAndFinalizeEpoch {
-        Stake[] storage stakes = userStakes[msg.sender];
-        require(stakes.length > 0, "No active stakes");
-
         uint256 totalReward = 0;
+        uint256 stakeCount = userStakes[msg.sender].length;
 
-        for (uint256 i = 0; i < stakes.length; i++) {
-            Stake storage userStake = stakes[i];
-            for (uint256 e = userStake.nextToClaim; e < epochId; e++) {
-                Epoch storage closedEpoch = epochs[e];
+        require(stakeCount > 0, "No active stakes");
+
+        for (uint256 i = 0; i < stakeCount; i++) {
+            Stake storage stakeRef = userStakes[msg.sender][i];  
+            uint256 rewardShares = stakeRef.rewardShares;  
+            uint256 nextEpoch = stakeRef.nextToClaim; 
+     
+            for (uint256 e = nextEpoch; e < epochId; e++) {
+                Epoch storage closedEpoch = epochs[e];  
+
                 if (closedEpoch.finalized && closedEpoch.rewardPerShare != 0) {
-                    totalReward += (closedEpoch.rewardPerShare * userStake.rewardShares) / 1e8;
+                    totalReward += (closedEpoch.rewardPerShare * rewardShares) / 1e8;
                 }
             }
-            userStake.nextToClaim = epochId;
+            stakeRef.nextToClaim = epochId;  
+         
         }
 
         require(address(this).balance >= totalReward, "Insufficient contract balance");
+
         (bool success, ) = msg.sender.call{value: totalReward}("");
         require(success, "HBAR transfer failed");
 
         emit RewardClaimed(msg.sender, totalReward);
     }
+
 
     // ====================================================
     // Utility Functions

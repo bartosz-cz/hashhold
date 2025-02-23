@@ -189,11 +189,11 @@
 			]
 		},
 		"contracts/hashhold.sol": {
-			"keccak256": "0x0e5b978f9afb24e8664856f5fdacb82e2485152b16725880e1a513e280c6ba26",
+			"keccak256": "0x326a09532daf9748cd8d257c813749fa40d04014c3b06e5186cd196d4eedc2ce",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://5419c3eb1e33b185e8010d54b8b1a37f296c2ec0b68aa45cfcd44104dd9aea06",
-				"dweb:/ipfs/QmaWiB8PrFZVd9wn3jRGfjCdAzEzvGJxPyR3ENYvMHPC9h"
+				"bzz-raw://62fae3d0a485d574fe813fc655349223db727882a6622266f70237aca463e360",
+				"dweb:/ipfs/QmYVhdQurj8CUmUtWHfowAdfc7tX587Xyfoiy9r2pZvWG3"
 			]
 		},
 		"contracts/hedera/HederaResponseCodes.sol": {

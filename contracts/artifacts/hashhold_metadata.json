@@ -14,18 +14,43 @@
 					},
 					{
 						"internalType": "address",
-						"name": "quoterV2Address",
+						"name": "_saucerSwapQuoterAddress",
 						"type": "address"
 					},
 					{
 						"internalType": "address",
-						"name": "_saucerSwapV2RouterAddress",
+						"name": "_saucerSwapRouterAddress",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "_usdcTokenAddress",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "_whbarTokenAddress",
 						"type": "address"
 					},
 					{
 						"internalType": "bytes32",
 						"name": "_hbarUsdPriceId",
 						"type": "bytes32"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_minStakeDuration",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_maxStakeDuration",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_epochDuration",
+						"type": "uint256"
 					}
 				],
 				"stateMutability": "nonpayable",
@@ -307,35 +332,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					},
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"name": "epochClaimed",
-				"outputs": [
-					{
-						"internalType": "bool",
-						"name": "",
-						"type": "bool"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
 				"inputs": [],
 				"name": "epochDuration",
 				"outputs": [
@@ -400,30 +396,6 @@
 						"internalType": "bool",
 						"name": "finalized",
 						"type": "bool"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					},
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"name": "fees",
-				"outputs": [
-					{
-						"internalType": "uint24",
-						"name": "",
-						"type": "uint24"
 					}
 				],
 				"stateMutability": "view",
@@ -495,13 +467,24 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "pyth",
-				"outputs": [
+				"inputs": [
 					{
-						"internalType": "contract IPyth",
+						"internalType": "address",
 						"name": "",
 						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "poolFees",
+				"outputs": [
+					{
+						"internalType": "uint24",
+						"name": "",
+						"type": "uint24"
 					}
 				],
 				"stateMutability": "view",
@@ -509,10 +492,10 @@
 			},
 			{
 				"inputs": [],
-				"name": "quoterV2",
+				"name": "pyth",
 				"outputs": [
 					{
-						"internalType": "contract IQuoterV2",
+						"internalType": "contract IPyth",
 						"name": "",
 						"type": "address"
 					}
@@ -558,10 +541,10 @@
 			},
 			{
 				"inputs": [],
-				"name": "saucerSwapV2Router",
+				"name": "saucerSwapQuoter",
 				"outputs": [
 					{
-						"internalType": "contract ISaucerSwapV2Router",
+						"internalType": "contract IQuoter",
 						"name": "",
 						"type": "address"
 					}
@@ -571,7 +554,20 @@
 			},
 			{
 				"inputs": [],
-				"name": "saucerSwapV2RouterAddress",
+				"name": "saucerSwapRouter",
+				"outputs": [
+					{
+						"internalType": "contract IRouter",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "saucerSwapRouterAddress",
 				"outputs": [
 					{
 						"internalType": "address",
@@ -591,29 +587,6 @@
 					}
 				],
 				"name": "setEpochDuration",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "token1",
-						"type": "address"
-					},
-					{
-						"internalType": "address",
-						"name": "token2",
-						"type": "address"
-					},
-					{
-						"internalType": "uint24",
-						"name": "newFees",
-						"type": "uint24"
-					}
-				],
-				"name": "setFees",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -648,37 +621,34 @@
 				"inputs": [
 					{
 						"internalType": "address",
+						"name": "token1",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "token2",
+						"type": "address"
+					},
+					{
+						"internalType": "uint24",
+						"name": "newFee",
+						"type": "uint24"
+					}
+				],
+				"name": "setPoolFees",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
 						"name": "_pyth",
 						"type": "address"
 					}
 				],
 				"name": "setPyth",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "_quoterV2",
-						"type": "address"
-					}
-				],
-				"name": "setQuoterV2",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "_router",
-						"type": "address"
-					}
-				],
-				"name": "setSaucerSwapV2Router",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -705,11 +675,11 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "usdc",
+						"name": "_usdcTokenAddress",
 						"type": "address"
 					}
 				],
-				"name": "setUsdcAddress",
+				"name": "setUsdcTokenAddress",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -718,11 +688,37 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "whbar",
+						"name": "_whbarTokenAddress",
 						"type": "address"
 					}
 				],
-				"name": "setWhbarAddress",
+				"name": "setWhbarTokenAddress",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_saucerSwapQuoter",
+						"type": "address"
+					}
+				],
+				"name": "setsaucerSwapQuoter",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_router",
+						"type": "address"
+					}
+				],
+				"name": "setsaucerSwapRouter",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -781,7 +777,7 @@
 						"type": "address"
 					}
 				],
-				"name": "totalStaked",
+				"name": "totalStakedAmount",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -875,7 +871,7 @@
 			},
 			{
 				"inputs": [],
-				"name": "usdcAddress",
+				"name": "usdcTokenAddress",
 				"outputs": [
 					{
 						"internalType": "address",
@@ -937,7 +933,7 @@
 			},
 			{
 				"inputs": [],
-				"name": "whbarAddress",
+				"name": "whbarTokenAddress",
 				"outputs": [
 					{
 						"internalType": "address",
@@ -967,7 +963,7 @@
 			}
 		],
 		"devdoc": {
-			"details": "Time-locked staking contract on Hedera. Demonstration only, not for production use.",
+			"details": "Time-locked staking contract on Hedera. ",
 			"errors": {
 				"OwnableInvalidOwner(address)": [
 					{
@@ -1003,20 +999,6 @@
 				"renounceOwnership()": {
 					"details": "Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner."
 				},
-				"stake(address,uint256,uint256,uint256,bytes[])": {
-					"params": {
-						"amount": "Amount of tokens to stake.",
-						"boostTokenAmount": "Additional tokens to burn for a reward boost.",
-						"duration": "Duration for which tokens are locked.",
-						"priceUpdate": "Pyth price feed updates.",
-						"tokenId": "The token being staked (0x0 for HBAR)."
-					}
-				},
-				"tokenAssociate(address)": {
-					"params": {
-						"tokenId": "The token address to associate with."
-					}
-				},
 				"transferFrom(address,address,address,uint256)": {
 					"params": {
 						"amount": "The amount of tokens to transfer from `from` to `to`",
@@ -1041,11 +1023,6 @@
 				},
 				"transferOwnership(address)": {
 					"details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
-				},
-				"withdraw(uint256)": {
-					"params": {
-						"stakeIndex": "Index of the user's stake to withdraw."
-					}
 				}
 			},
 			"title": "HashHold",
@@ -1059,47 +1036,14 @@
 			},
 			"kind": "user",
 			"methods": {
-				"claimReward()": {
-					"notice": "Claims all available rewards from finalized epochs."
-				},
 				"redirectForToken(address,bytes)": {
 					"notice": "Redirect for token"
-				},
-				"setEpochDuration(uint256)": {
-					"notice": "Change the epoch duration (e.g., 1 hours → 2 hours)."
-				},
-				"setHbarUsdPriceId(bytes32)": {
-					"notice": "Update the Pyth HBAR/USD price feed ID."
-				},
-				"setPenaltyRate(uint256)": {
-					"notice": "Update the penalty rate (0 - 100)."
-				},
-				"setPyth(address)": {
-					"notice": "Update the Pyth price feed contract."
-				},
-				"setQuoterV2(address)": {
-					"notice": "Update the quoter contract address."
-				},
-				"setSaucerSwapV2Router(address)": {
-					"notice": "Update the SaucerSwap V3 router address."
-				},
-				"setStakeDurationBounds(uint256,uint256)": {
-					"notice": "Update min/max stake durations."
-				},
-				"stake(address,uint256,uint256,uint256,bytes[])": {
-					"notice": "Stake tokens or HBAR into the current epoch."
-				},
-				"tokenAssociate(address)": {
-					"notice": "Associates this contract with a given HTS token."
 				},
 				"transferFrom(address,address,address,uint256)": {
 					"notice": "Only applicable to fungible tokens"
 				},
 				"transferFromNFT(address,address,address,uint256)": {
 					"notice": "Transfers `serialNumber` of `token` from `from` to `to` using the allowance mechanism. Only applicable to NFT tokens"
-				},
-				"withdraw(uint256)": {
-					"notice": "Withdraw staked tokens. If withdrawn early, a penalty applies."
 				}
 			},
 			"version": 1
@@ -1107,7 +1051,7 @@
 	},
 	"settings": {
 		"compilationTarget": {
-			"contracts/hashhold.sol": "hashhold"
+			"contracts/hashhold.sol": "HashHold"
 		},
 		"evmVersion": "cancun",
 		"libraries": {},
@@ -1194,11 +1138,11 @@
 			]
 		},
 		"contracts/hashhold.sol": {
-			"keccak256": "0x41cd717c99103fd1b10052c009f3206858804285eda034d3d7c707f71e5366eb",
+			"keccak256": "0x326a09532daf9748cd8d257c813749fa40d04014c3b06e5186cd196d4eedc2ce",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://1e0f043ff27147a8c20ddf62e5beb7e592b9bba890a25ebc7068190b747fd3b9",
-				"dweb:/ipfs/QmXRyQM49KEsTZA22X7jnm4KRp61i7SLoC2Hr4hoC4c6Qd"
+				"bzz-raw://62fae3d0a485d574fe813fc655349223db727882a6622266f70237aca463e360",
+				"dweb:/ipfs/QmYVhdQurj8CUmUtWHfowAdfc7tX587Xyfoiy9r2pZvWG3"
 			]
 		},
 		"contracts/hedera/HederaResponseCodes.sol": {
