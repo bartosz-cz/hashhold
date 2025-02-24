@@ -1,6 +1,6 @@
 # HashHold
 
-**HashHold** is a time-locked staking contract built for the Hedera network. It allows users to stake HBAR or HTS tokens for a fixed duration, earn rewards over epochs, and withdraw their stake—with an early withdrawal penalty if applicable. The contract uses external price feeds (from Pyth) and decentralized swap/quoting services (from SaucerSwap) to determine the USD value of staked tokens, ensuring that only stakes with a minimum value (e.g., above 1 USD) are accepted.
+**HashHold** is a time-locked staking contract built for the Hedera network. It allows users to stake HBAR or HTS tokens for a fixed duration, earn rewards over epochs, and withdraw their stake with an early withdrawal penalty if applicable. The contract uses external price feeds (from Pyth) and decentralized swap/quoting services (from SaucerSwap) to determine the USD value of staked tokens, ensuring that only stakes with a minimum value (e.g., above 1 USD) are accepted.
 
 ---
 
