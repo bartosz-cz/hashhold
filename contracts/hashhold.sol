@@ -104,7 +104,7 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
         uint256 stakeIndex,
         address tokenId
     );
-    event Withdrawn(
+    event Unstaked(
         address indexed user,
         uint256 stakeIndex,
         uint256 amount,
@@ -301,6 +301,7 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             "Stake duration out of range"
         );
         require(userStakes[msg.sender].length < 10, "Maximum number of active stakes reached");
+        require(boostTokenAmount == 0, "boost token implementation not completed");
         
         uint256 tokenValue;
         uint256 stakedAmount = amount;
@@ -386,43 +387,43 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
     }
 
     // ====================================================
-    // Withdraw Function
+    // Unstake Function
     // ====================================================
-    function withdraw(uint256 stakeIndex) external nonReentrant checkAndFinalizeEpoch {
+    function Unstake(uint256 stakeIndex) external nonReentrant checkAndFinalizeEpoch {
         _claimReward();
         uint256 stakeCount = userStakes[msg.sender].length;
         require(stakeIndex < stakeCount, "Invalid index");
 
         Stake storage userStake = userStakes[msg.sender][stakeIndex];
-        require(userStake.amount > 0, "Already withdrawn");
-
-        uint256 withdrawAmount = userStake.amount;
-        bool isEarlyWithdrawal = block.timestamp < userStake.endTime;
+        require(userStake.amount > 0, "Already Unstake");
+        
+        uint256 UnstakeAmount = userStake.amount;
+        bool isEarlyUnstake = block.timestamp < userStake.endTime;
         uint256 penalty = 0;
         uint256 penaltyInHbar = 0;
 
-        if (isEarlyWithdrawal) {
-            penalty = (withdrawAmount * penaltyRate) / 100;
-            withdrawAmount -= penalty;
+        if (isEarlyUnstake) {
+            penalty = (UnstakeAmount * penaltyRate) / 100;
+            UnstakeAmount -= penalty;
         }
 
-        totalStakedAmount[userStake.tokenId] -= (withdrawAmount + penalty);
+        totalStakedAmount[userStake.tokenId] -= (UnstakeAmount + penalty);
 
         if (userStake.tokenId == address(0)) {
             penaltyInHbar = penalty;
-            require(address(this).balance >= withdrawAmount, "Insufficient contract balance");
-            (bool success, ) = msg.sender.call{value: withdrawAmount}("");
+            require(address(this).balance >= UnstakeAmount, "Insufficient contract balance");
+            (bool success, ) = msg.sender.call{value: UnstakeAmount}("");
             require(success, "Failed to send HBAR");
         } else {
             int256 responseCode = HederaTokenService.transferToken(
                 userStake.tokenId,
                 address(this),
                 msg.sender,
-                safeCastToInt64(withdrawAmount)
+                safeCastToInt64(UnstakeAmount)
             );
             require(responseCode == HederaResponseCodes.SUCCESS, "Token transfer back failed");
 
-            if (isEarlyWithdrawal) {
+            if (isEarlyUnstake) {
                 responseCode = HederaTokenService.approve(
                     userStake.tokenId,
                     saucerSwapRouterAddress,
@@ -472,17 +473,17 @@ contract HashHold is HederaTokenService, ReentrancyGuard, Ownable {
             }
         }
 
-        if (isEarlyWithdrawal) {
+        if (isEarlyUnstake) {
             epochs[epochId].totalReward += penaltyInHbar;
         }
 
         epochs[epochId].totalRewardShares -= userStake.rewardShares;
 
-        emit Withdrawn(
+        emit Unstaked(
             msg.sender,
             stakeIndex,
-            withdrawAmount,
-            isEarlyWithdrawal,
+            UnstakeAmount,
+            isEarlyUnstake,
             penaltyInHbar
         );
         
